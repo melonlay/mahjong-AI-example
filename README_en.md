@@ -1,146 +1,202 @@
-[View Chinese Version (查看中文版)](README.md)
+[查看中文版 (View Chinese Version)](README.md)
 
 # Mahjong Tile AI Clustering Tool
 
 ## Important Disclaimer
 
-**This project serves solely as a technical demonstration and for educational purposes, explaining the process of training an AI model for Mahjong tile clustering. The project itself does not provide any pre-trained model weights (`.pth` files) or a ready-to-use Mahjong AI for practical application. Users need to collect their own data and complete the model training steps themselves. Furthermore, please note that the method described in this document is not the only way to achieve Mahjong tile clustering; various other techniques and strategies exist to accomplish similar goals.**
+**This project serves solely as a technical demonstration and educational resource, explaining the process of training an AI model for Mahjong tile clustering. The project itself does not provide any pre-trained model weights (`.pth` files) or a ready-to-use Mahjong AI application. Users need to collect their own data and complete the model training steps. Furthermore, please note that the methods described in this document are not the only way to achieve Mahjong tile clustering; various different techniques and strategies can accomplish similar goals.**
 
 ## Project Goal
 
-This tool uses AI technology to automatically cluster captured Mahjong tile images using unsupervised learning. The goal is to start from scratch, collect data, train a model, and finally classify unknown Mahjong tile images (from the `capture/` directory) into different clusters within the `clustered_tiles/` directory. The project targets three-player Mahjong, aiming to divide the tiles into 29 categories.
+This tool uses AI technology to automatically perform unsupervised clustering on captured Mahjong tile images. The goal is to start from scratch, collect data, train a model, and ultimately classify unknown Mahjong tile images (from the `capture/` directory) into different clusters within the `clustered_tiles/` directory. The project targets three-player Mahjong, aiming to classify tiles into 29 categories.
 
 ## Project Structure
 
 ```
 .
-├── capture/              # Stores Mahjong image files **to be classified**
+├── capture/              # Stores Mahjong tile image files **to be classified/clustered**
 ├── clustered_tiles/      # Stores **clustering results**, each subdirectory represents a cluster
 ├── configs/
-│   ├── roi_config.json   # Region of Interest (ROI) config file
-│   ├── tile_mapping.json # (Potential) Tile name/ID mapping file
-│   └── tile_slicer_config.json # Tile slicing config file
-├── data/                 # Stores manually classified Mahjong image files **for model training** (contains subdirs for each class)
+│   ├── roi_config.json   # Region of Interest (ROI) configuration file
+│   ├── tile_mapping.json # (Possible) Tile name/ID mapping file
+│   └── tile_slicer_config.json # Tile slicing configuration file
+├── data/                 # Stores manually classified tile image files **for model training** (contains subdirectories for each class, including noise)
 ├── gui/
 │   ├── __init__.py       # GUI package identifier
 │   ├── control_panel.py  # Control panel UI component
 │   ├── image_display.py  # Image display UI component
-│   └── main_window.py    # Main application window UI (for image collection & display)
+│   └── main_window.py    # Main application window UI (for image collection and display)
 ├── image_processing/
 │   ├── __init__.py       # Image processing package identifier
 │   ├── hand_detector.py  # Hand detection related logic
 │   ├── tile_defs.py      # Tile definitions or constants
 │   └── tile_slicer.py    # Tile slicing logic
 ├── image_utils/
-│   └── screen_capture.py # Screen capture utility functions
+│   └── screen_capture.py # Screen capture utility function
+├── test_inference/       # Directory for storing **classification model inference results**
 ├── tools/
 │   ├── cluster_captured_tiles.py # Script to execute image clustering (includes fallback method)
-│   ├── find_roi_interactively.py # Tool to find ROI interactively
-│   ├── interactive_tile_slicer.py # Tool for interactive tile slicing
-│   └── restore_capture_from_clusters.py # (Potential) Tool to restore capture dir from clusters
+│   ├── find_roi_interactively.py # Tool for interactively finding the ROI
+│   ├── infer_and_organize.py     # Script to infer and organize files using the classification model
+│   └── interactive_tile_slicer.py # Interactive tile slicing tool
 ├── trainer/
-│   └── clustering/
-│       # (May contain __init__.py, dataset.py, etc.)
-│       ├── model.py      # CNN model definition
-│       ├── train.py      # Script to train the CNN model
-│       └── result/
-│           └── best_mahjong_feature_extractor.pth # Trained best model weights
-├── main.py               # Main application entry point, launches GUI to assist image collection etc.
-├── README.md             # Chinese version of this documentation
-└── README_en.md          # This documentation file (English)
-# --- The following files are commonly present but not shown by list_dir; manual confirmation/addition is recommended ---
-# ├── requirements.txt      # Lists required Python dependencies
-# ├── .gitignore            # Specifies intentionally untracked files that Git should ignore
+│   ├── clustering/       # Clustering model training related
+│   │   ├── model.py      # CNN model definition for clustering (e.g., SupConResNet)
+│   │   ├── train.py      # Script to train the clustering feature extraction model
+│   │   └── result/       # Stores clustering model training results
+│   │       └── ... .pth    # Trained clustering model weights
+│   └── classification/   # Classification model training related
+│       ├── model.py      # CNN model definition for classification (e.g., SimpleMahjongCNN)
+│       ├── dataset.py    # Classification dataset handling
+│       ├── train.py      # Script to train the classification model
+│       ├── eval.py       # Script to evaluate the classification model
+│       └── results/      # Stores classification model training results
+│           ├── logs/       # TensorBoard logs
+│           └── models/     # Trained classification model weights
+│               └── ... .pth
+├── main.py               # Main application entry point, launches the GUI for assisted image collection etc.
+├── README.md             # This documentation file (Chinese)
+└── README_en.md          # English version documentation file
+# --- The following files usually exist but were not shown by list_dir, manual check/addition recommended ---
+# ├── requirements.txt      # Lists required Python dependencies for the project
+# ├── .gitignore            # Specifies files/directories Git should ignore
 ```
 
-## Complete Workflow From Scratch
+## Complete Workflow from Scratch
 
-Below are the complete steps from having no data or model to obtaining the final clustering results:
+Below are the complete steps from having no data and models to finally being able to train and use clustering and classification models:
 
 ### Step 1: Environment Setup
 
 1.  **Python**: Ensure Python is installed (version 3.8 or higher recommended).
 2.  **Dependencies**: Install the required Python libraries. Open a terminal or command prompt and run:
     ```bash
-    pip install torch torchvision opencv-python numpy scikit-learn Pillow
+    pip install torch torchvision opencv-python numpy scikit-learn Pillow tensorboard
     ```
-    *   **Important**: For optimal performance (especially when using a GPU for training), refer to the [official PyTorch website](https://pytorch.org/) to install `torch` and `torchvision` according to your operating system, Python version, and CUDA version (if you have an NVIDIA GPU with CUDA installed).
+    *   **Important**: For optimal performance (especially leveraging GPU during training), refer to the instructions on the [PyTorch official website](https://pytorch.org/) to install `torch` and `torchvision` based on your operating system, Python version, and CUDA version (if you have an NVIDIA GPU with CUDA installed).
 
-**Purpose of this step:** To prepare the necessary foundation for the project to run. Python is the programming language itself, while the dependencies provide crucial functionalities: `torch` and `torchvision` for deep learning model training and image processing, `opencv-python` for image reading and basic operations, `numpy` for numerical computation, `scikit-learn` for clustering algorithms and evaluation, and `Pillow` for image handling.
+**Purpose of this step:** Prepare the necessary runtime foundation for the project. Python is the programming language itself, while the dependencies provide key functionalities: `torch` and `torchvision` for deep learning model training and image processing, `opencv-python` for image reading and basic operations, `numpy` for numerical computations, `scikit-learn` for clustering algorithms and evaluation, `Pillow` for image handling, and `tensorboard` for visualizing the training process.
 
-### Step 2: Create Initial Training Data using Preliminary Clustering
+### Step 2: Create Initial Training Data Base using Preliminary Clustering
 
-The goal of this step is to create the first version of a labeled training dataset (`./data/`) starting from completely unlabeled images, reducing the burden of purely manual classification.
+The goal of this step is to start with completely unlabeled images and use a **pre-defined clustering method** to create a preliminarily classified dataset, reducing the burden of subsequent manual labeling and organization.
 
-1.  **Collect Initial Unlabeled Images**: Place all the Mahjong tile images you have collected (without manual sorting) into the `capture/` directory first.
-    *   **Tip:** You can run `python main.py` to launch the graphical user interface (GUI). This interface likely includes features like screen capture, hand region selection (ROI), and tile slicing, which can **greatly assist you** in collecting and extracting individual Mahjong tile images from game screens or other sources and saving them to the `capture/` directory.
-2.  **Perform Preliminary Clustering (Using Fallback Method)**: Run the clustering script. Since there is no custom model yet, the script will automatically use the fallback method (ResNet18 + color features) for clustering.
+1.  **Collect Initial Unclassified Images**: Place all collected Mahjong tile images (no need for manual classification yet) into the `capture/` directory.
+    *   **Tip:** You can run `python main.py` to launch the graphical user interface (GUI). This interface might include features like screen capture, hand region selection (ROI), and tile slicing, which can **greatly assist** you in collecting and slicing individual Mahjong tile images from game screens or other sources and saving them to the `capture/` directory.
+2.  **Perform Preliminary Clustering (Using Fallback Method)**: Run the clustering script. Since there is no custom model yet, the script will **automatically use the fallback method** (based on pre-trained ResNet18 + color features) for clustering.
     ```bash
+    # Ensure running from the project root directory
     python tools/cluster_captured_tiles.py
     ```
-3.  **Review and Organize Preliminary Results**: After the script finishes, preliminary clustering results (e.g., `cluster_00`, `cluster_01`, ...) will be generated in the `clustered_tiles/` directory. Now, **manual review and organization** are required:
+3.  **Review and Organize Preliminary Results**: After the script finishes, the `clustered_tiles/` directory will contain the initial clustering results (e.g., `cluster_00`, `cluster_01`, ...). **Manual review and organization** are now required to prepare the base data for training the **custom clusterer** and **classifier** later:
     *   Create the `./data` directory (if it doesn't exist).
-    *   Under `./data`, create corresponding subdirectories for each Mahjong tile type (29 types in total), e.g., `1m`, `Aka5p`, `N`, etc.
-    *   **Examine each** `cluster_XX` subdirectory under `clustered_tiles/` one by one. Ideally, a cluster should mostly contain the same type of tile.
-    *   **Move** the images **confirmed to belong to the same tile type** from each `cluster_XX` directory to the **correct category subdirectory** under `./data/`. For example, if `cluster_05` mostly contains "1 Man" tiles, move all "1 Man" images from it to `./data/1m/`.
-    *   For obviously misclassified images (e.g., a "North Wind" tile mixed in the "1 Man" cluster), move them to the correct category subdirectory under `./data/` (e.g., `./data/N/`). You can discard images that are of too poor quality or unrecognizable for now.
-4.  **Complete First Version of Training Set**: Once you have organized all usable images from `clustered_tiles/`, the `./data/` directory now contains your first version of the training dataset with (relatively) accurate labels.
+    *   Inside `./data`, create subdirectories for each type of Mahjong tile (target is 29 types currently, e.g., `1m`, `Aka5p`, `N`, etc.). Also, create a `noise` subdirectory (`./data/noise/`) for non-Mahjong tile images (e.g., background, special effects glow, unrecognizable images, etc.).
+    *   **Examine** each `cluster_XX` subdirectory under `clustered_tiles/` one by one. Ideally, a cluster should mostly contain the same type of tile.
+    *   **Move** the images **confirmed to be of the same tile type** from each `cluster_XX` directory to the corresponding **correct class subdirectory** under `./data/`. For example, if `cluster_05` mostly contains "1 Man" tiles, move all "1 Man" images from it to `./data/1m/`.
+    *   For obviously misclassified images (e.g., a "North Wind" tile mixed in the "1 Man" cluster), move it to the correct class subdirectory under `./data/` (e.g., `./data/N/`).
+    *   If you find non-Mahjong tile images (like backgrounds, flashes) incorrectly clustered, move them to the `./data/noise/` directory. Poor quality or unrecognizable images can also be placed in `noise` or discarded.
+4.  **Complete First Version of Training Set**: Once you have organized all usable images from `clustered_tiles/`, the `./data/` directory contains your first version of the training dataset with (relatively) accurate labels.
 
-**Purpose of this step:** To address the lack of labeled data when starting from scratch. By leveraging the machine's preliminary clustering ability, the heavy task of full manual classification is transformed into a task of **review and correction**, significantly improving the efficiency of creating the initial training set. The resulting `./data/` directory forms the basis for training the custom model later.
+**Purpose of this step:** Address the lack of labeled data when starting from scratch. By leveraging the machine's preliminary clustering capability, the heavy task of full manual classification is transformed into a task of **reviewing and correcting**, significantly improving the efficiency of creating the initial training set. The resulting `./data/` directory is the foundation for training custom clustering and classification models later.
 
-### Step 3: Train the First Custom Feature Extraction Model
+### Step 3: Train the First Custom Clustering Feature Extraction Model
 
-Use the first version of the `./data/` dataset created in the previous step to train your first custom CNN model.
+Using the first version of the `./data/` dataset created in the previous step, train your first **custom clustering feature extraction model** (using Supervised Contrastive Learning). The goal of this model is to learn a good feature space where Mahjong tiles of the same class are closer together.
 
-1.  **Run Training Script**: Ensure `--data_dir` points to your organized `./data` directory.
+1.  **Run Clustering Training Script**: Ensure `--data_dir` points to your organized `./data` directory.
     ```bash
-    python trainer/clustering/train.py --data_dir ./data --output_dir trainer/clustering --epochs 150 --batch_size 128 --lr 5e-4 --temperature 0.1 --image_size 96 --num_workers 4 --seed 42 --eval_freq 10 --save_freq 50
+    # Recommended to run from the project root directory
+    python trainer/clustering/train.py --data_dir ./data --output_dir trainer/clustering --epochs 100 --batch_size 128 --lr 5e-4 --save_top_k 3 [other_parameters...]
     ```
-    *   (Parameter explanations as before)
+    *   `--data_dir ./data`: Specifies the directory containing the classified training images.
+    *   `--output_dir trainer/clustering`: Specifies the directory to save training logs and model files.
+    *   `--epochs 100`: Number of training epochs (SupCon might need more).
+    *   `--batch_size 128`: Batch size (contrastive learning often benefits from larger batches).
+    *   `--lr 5e-4`: Learning rate.
+    *   `--save_top_k 3`: Saves the top 3 models based on the validation set ARI metric (adjustable).
+    *   *(Check the `trainer/clustering/train.py` script for more available parameters)*
+2.  **Obtain Custom Clustering Model**: After training completes, the top K performing models will be saved in the `trainer/clustering/result/` directory, with filenames like `model_epoch_XX_ari_Y.YYYY.pth`.
 
-2.  **Obtain the First Custom Model**: After training completes, the best model weights will be saved to `trainer/clustering/result/best_mahjong_feature_extractor.pth`.
+**Purpose of this step:** Generate the first **feature extractor** optimized for Mahjong tiles based on the preliminarily organized data. Although the training data might not be perfect yet, the features learned by this model are generally more suitable for subsequent Mahjong tile clustering tasks than the generic ResNet18.
 
-**Purpose of this step:** To generate the first feature extractor optimized for Mahjong tiles based on the initially curated data. Although the training data might not be perfect yet, this model will typically perform better than the generic ResNet18, laying the groundwork for more accurate clustering later.
+### Step 4: Prepare New Images for Clustering
 
-### Step 4: Prepare New Images for Classification
+Collect the **new** Mahjong tile images that you want to automatically cluster using the **trained custom clustering model**.
 
-Collect **new** Mahjong tile images that you want to automatically classify using the **already trained custom model**.
+1.  **Empty or Fill `capture/` Directory**: Place these **new, unclassified** images into the `capture/` directory.
 
-1.  **Clear or Fill `capture/` Directory**: Place these **new, unlabeled** images into the `capture/` directory.
+**Purpose of this step:** Provide the actual input data that needs to be clustered using the **optimized model**.
 
-**Purpose of this step:** To provide the actual input data that needs to be classified using the **optimized model**.
+### Step 5: Perform Image Clustering using the Custom Model
 
-### Step 5: Execute Image Clustering using the Custom Model
+Utilize the **best custom clustering model** trained in Step 3 to cluster the new images prepared in Step 4.
 
-Utilize the custom model trained in Step 3 to classify the new images prepared in Step 4.
-
-1.  **Confirm Model Existence**: Ensure the `trainer/clustering/result/best_mahjong_feature_extractor.pth` file exists.
-2.  **Run Clustering Script**: Run the clustering script again.
+1.  **Run Clustering Script**: Run the clustering script again, this time using the `--model_path` parameter to specify the path to the model file you want to use.
     ```bash
-    python tools/cluster_captured_tiles.py
+    # Replace <path_to_your_best_cluster_model.pth> with the actual model file path
+    # e.g., trainer/clustering/result/model_epoch_XX_ari_Y.YYYY.pth
+    python tools/cluster_captured_tiles.py --model_path <path_to_your_best_cluster_model.pth>
     ```
-3.  **Processing**: This time, the script will:
-    *   **Successfully load** the custom model trained in Step 3.
+    *   **Note**: If the `--model_path` parameter is omitted, or if the provided path is invalid (file doesn't exist or cannot be loaded), the script will **automatically fall back** to using the alternative method (pre-trained ResNet18 + color features) for clustering and display a warning in the logs.
+2.  **Processing**: If a valid model path is provided, the script will now:
+    *   **Successfully load** the custom clustering model specified via `--model_path`.
     *   Read the **new** images from `capture/`.
     *   Extract feature vectors for each new image using the **custom model**.
-    *   Cluster these feature vectors into 29 groups using `AgglomerativeClustering`.
-    *   Copy the new images from `capture/` to the corresponding cluster subdirectories under `clustered_tiles/`.
+    *   Cluster these feature vectors into **30** clusters using `AgglomerativeClustering` (because we include noise).
+    *   Copy the new images from `capture/` to the corresponding cluster subdirectories under `clustered_tiles/` based on the clustering results.
 
-**Purpose of this step:** To apply the **optimized custom model** to new, unseen data, expecting more accurate classification results than the preliminary clustering in Step 2.
+**Purpose of this step:** Apply the **optimized custom clustering model** to process new, unknown data, expecting more accurate clustering results than the preliminary clustering in Step 2.
 
-**Fallback Clustering Method Explanation:**
-*   This method is primarily used during the **initial data curation phase in Step 2**. While the script will still fall back to this method if the custom model fails to load, the expectation in the normal iterative workflow (Step 5) is to use the custom model.
+### Step 6: Review Results and Iteratively Optimize the Clusterer
 
-### Step 6: Review Results and Iterate for Optimization
+*   Check the latest clustering results obtained **using the custom clustering model** in the `clustered_tiles/` directory.
+*   Evaluate the clustering performance. Usually, these results will be more accurate than the preliminary results from Step 2.
+*   **(Optional) Iteratively Optimize the Clusterer**: If you want to further improve the **clustering model's** effectiveness, carefully review the results in `clustered_tiles/` this time. **Add** the **correctly** classified images (including tiles correctly clustered into a tile group and noise images correctly clustered into the noise group) back to the `./data/` directory according to their **true class** (including the `noise` class) to **expand and refine** your training dataset. Then, you can optionally return to **Step 3**, use the updated `./data/` to **retrain the clustering model**, aiming for further performance improvement. Repeating this process (Step 3 -> Step 4 -> Step 5 -> Step 6 -> Update Data -> Step 3...) can continuously optimize the clustering model.
 
-*   Check the latest clustering results in the `clustered_tiles/` directory, which were generated **using the custom model**.
-*   Evaluate the clustering performance. These results should generally be more accurate than the preliminary ones from Step 2.
-*   **(Optional) Iterative Optimization**: If you are satisfied with the results, you can consider **adding** the correctly classified images from this `clustered_tiles/` run back into the corresponding categories in the `./data/` directory. This **augments and refines** your training dataset. You can then optionally go back to **Step 3**, retrain the model using the updated `./data/`, potentially achieving further performance improvements. Repeating this cycle (Step 3 -> Step 4 -> Step 5 -> Step 6 -> Update Data -> Step 3...) allows for continuous model optimization.
+**Purpose of this step:** Evaluate the effectiveness of the custom clustering model and provide a path for continuous improvement. By repeatedly processing new data with the model and feeding the verified results back into the training set, the feature extraction capability of the clustering model can be gradually enhanced.
 
-**Purpose of this step:** To evaluate the custom model's performance and provide a pathway for continuous improvement. By repeatedly processing new data with the model and feeding the validated results back into the training set, the model's accuracy and robustness can be progressively enhanced.
+### Step 7: Train Classification Model
+
+After ensuring that the `./data/` directory contains training data with accurate labels (each subdirectory represents a class, **including a `noise` class**) through clustering-assisted organization and manual labeling, you can start training a **classification model**. The goal of this model is to directly predict which specific class an input image belongs to (e.g., "1m", "Wh", "noise").
+
+1.  **Confirm Training Data**: Double-check the `./data/` directory and its subdirectories to ensure the data is organized by class and the `noise` directory contains representative non-Mahjong tile images.
+2.  **Run Classification Training Script**: Execute the `trainer/classification/train.py` script.
+    ```bash
+    # Recommended to run from the project root directory
+    python -m trainer.classification.train --data_dir ./data --output_dir trainer/classification/results --epochs 50 --batch_size 128 --lr 0.001 --save_top_k 3 --num_workers 4
+    ```
+    *   `--data_dir ./data`: Specifies the directory containing the classified training images.
+    *   `--output_dir trainer/classification/results`: Specifies the directory to save training logs and model files.
+    *   `--epochs 50`: Number of training epochs (adjustable).
+    *   `--batch_size 128`: Batch size (adjust based on GPU memory).
+    *   `--lr 0.001`: Learning rate.
+    *   `--save_top_k 3`: Saves the top 3 models with the highest validation accuracy (adjustable).
+    *   `--num_workers 4`: Number of data loading workers.
+    *   *(Check the `trainer/classification/train.py` script for more available parameters)*
+3.  **Obtain Classification Model**: After training completes, the top K performing models will be saved in the `trainer/classification/results/models/` directory, with filenames like `model_epoch_XX_acc_Y.YYYY.pth`.
+
+**Purpose of this step:** Train a supervised learning model capable of making explicit class predictions for input Mahjong tile images (or non-Mahjong images). This model is the basis for subsequent automatic classification, inference, and organization tasks.
+
+### Step 8: Utilize the Classifier for Subsequent Work (Inference and Organization)
+
+Once the **classification model** is trained, you can use it to predict labels for a batch of new, unlabeled images and automatically organize these images into folders named after the predicted classes.
+
+1.  **Prepare Images for Classification**: Place the images you want to classify into a folder, for example, the `./capture` directory.
+2.  **Find the Trained Classification Model**: Locate the classification model file (`.pth` file) you want to use in the `trainer/classification/results/models/` directory, e.g., `model_epoch_XX_acc_Y.YYYY.pth`.
+3.  **Run Inference and Organization Script**: Execute the `tools/infer_and_organize.py` script.
+    ```bash
+    python tools/infer_and_organize.py --model_path <path_to_your_model.pth> --input_dir ./capture --output_dir ./test_inference
+    ```
+    *   Replace `<path_to_your_model.pth>` with the actual path to your chosen classification model file.
+    *   `--input_dir`: Specifies the directory containing the images to be classified (defaults to `./capture`).
+    *   `--output_dir`: Specifies the directory to save the organized results (defaults to `./test_inference`, will be cleared if it already exists).
+4.  **View Inference Results**: After the script finishes, check the `./test_inference/` directory. The script will create subdirectories for each predicted class (e.g., `1m`, `Wh`, `noise`, etc.) based on the model's predictions and copy the corresponding original images into these subdirectories.
+
+**Purpose of this step:** Provide a method to directly use the **trained classification model** for predicting labels on new images and automatically organizing the files, facilitating quick review of the model's actual classification performance or for use in other subsequent applications.
 
 ## Notes
 
-*   **Data Quality is Key**: Careful review and labeling of data, both during initial curation (Step 2) and subsequent iterations (Step 6), is crucial for improving model performance.
-*   **Training Time**: Model training in Step 3 can take a significant amount of time.
-*   **Iterative Improvement**: As described in Step 6, retraining with new data and the model is a common method to enhance results.
+*   **Data Quality is Key**: Whether during initial organization (Step 2) or subsequent iterations (Step 6), carefully reviewing and labeling data is crucial for improving model performance.
+*   **Training Time**: Model training (clustering feature extraction or classification) can take a significant amount of time, depending on the data volume and hardware.
+*   **Iterative Improvement**: As mentioned in Step 6, iteratively training the **clustering model** with new data and model feedback is a common method to enhance its feature extraction effectiveness. Classification model training is typically done once the data labels are relatively stable.
+*   **Distinguish Clustering and Classification**: Be aware of the different goals and training methods for Clustering (learning good feature representations to distinguish groups) and Classification (mapping input to known labels).

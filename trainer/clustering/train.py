@@ -212,17 +212,22 @@ def get_contrastive_transforms(size=96):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-    # 增強流程 (應用於 PIL Image)
+    # 增強流程 (移除顏色抖動和灰度化)
     augmentation = transforms.Compose([
         transforms.RandomResizedCrop(size=size, scale=(0.6, 1.0)),
         transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomApply([
-            transforms.ColorJitter(
-                brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1)
-        ], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor(),
-        normalize,
+        # Removed ColorJitter
+        # transforms.RandomApply([
+        #     transforms.ColorJitter(
+        #         brightness=0.3, contrast=0.3, saturation=0.4, hue=0.1)
+        # ], p=0.8),
+        # Removed RandomGrayscale
+        # transforms.RandomGrayscale(p=0.2),
+        transforms.ToTensor(),  # Convert to tensor first
+        normalize,  # Then normalize
+        # Keep RandomErasing
+        transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(
+            0.3, 3.3), value='random', inplace=False)
     ])
 
     # 返回 TwoCropTransform 的實例，而不是 lambda
@@ -465,8 +470,11 @@ def main(args):
     # --- 訓練循環 (加入評估和最佳模型保存) ---
     logger.info("開始訓練...")
     start_train_time = time.time()
-    best_ari = -1.0  # 初始化最佳 ARI
-    best_epoch = -1
+    # <<< 初始化 top K 列表 >>>
+    top_k_models = []  # 存儲 (ari_score, epoch, path)
+    # <<< 移除舊的 best_ari, best_epoch 初始化 >>>
+    # best_ari = -1.0
+    # best_epoch = -1
 
     for epoch in range(args.epochs):
         train_loss = train_epoch(
@@ -475,33 +483,60 @@ def main(args):
         if scheduler:
             scheduler.step()
 
-        # --- 執行評估 --- (每隔一定 epoch 或每個 epoch)
+        # --- 執行評估 --- #
         current_ari = -1.0
         current_nmi = -1.0
-        if eval_loader and ((epoch + 1) % args.eval_freq == 0 or epoch == args.epochs - 1):
+        # <<< 修改條件以檢查 save_top_k > 0 >>>
+        if eval_loader and args.save_top_k > 0 and \
+           ((epoch + 1) % args.eval_freq == 0 or epoch == args.epochs - 1):
             logger.info(f"--- Epoch {epoch+1} 結束，開始評估聚類效果 ---")
             current_ari, current_nmi = evaluate_clustering(
                 model.encoder, eval_loader, device, num_classes, args.seed)
             logger.info(
                 f"--- 評估完成 - ARI: {current_ari:.4f}, NMI: {current_nmi:.4f} ---")
 
-            # --- 保存最佳模型 (基於 ARI) ---
-            if current_ari > best_ari:
-                best_ari = current_ari
-                best_epoch = epoch + 1
-                save_dir = os.path.join(args.output_dir, 'result')
-                os.makedirs(save_dir, exist_ok=True)
-                best_model_path = os.path.join(
-                    save_dir, 'best_mahjong_feature_extractor.pth')
+            # --- 保存 Top K 模型 (基於 ARI) --- #
+            save_dir = os.path.join(args.output_dir, 'result')
+            os.makedirs(save_dir, exist_ok=True)
+
+            # <<< 新增: 檢查是否需要保存 >>>
+            should_save = len(top_k_models) < args.save_top_k or \
+                (top_k_models and current_ari > top_k_models[0][0])
+
+            if should_save:
+                current_model_filename = f'model_epoch_{epoch+1}_ari_{current_ari:.4f}.pth'
+                current_model_path = os.path.join(
+                    save_dir, current_model_filename)
+                logger.info(
+                    f"*** 驗證集 ARI {current_ari:.4f} 達到 Top {args.save_top_k} 標準。正在保存模型到: {current_model_path} ***")
                 try:
-                    torch.save(model.encoder.state_dict(), best_model_path)
-                    logger.info(
-                        f'*** 新的最佳模型 (ARI: {best_ari:.4f}) 已保存到: {best_model_path} (Epoch {best_epoch}) ***')
+                    torch.save(model.encoder.state_dict(), current_model_path)
+                    top_k_models.append(
+                        (current_ari, epoch + 1, current_model_path))
+                    top_k_models.sort(key=lambda x: x[0])  # 按 ARI 升序排序
+
+                    if len(top_k_models) > args.save_top_k:
+                        worst_model_info = top_k_models.pop(0)
+                        worst_model_path = worst_model_info[2]
+                        if os.path.exists(worst_model_path):
+                            try:
+                                os.remove(worst_model_path)
+                                logger.info(
+                                    f"已移除表現較差的模型文件: {os.path.basename(worst_model_path)}")
+                            except OSError as e:
+                                logger.error(
+                                    f"移除舊模型文件 {worst_model_path} 時出錯: {e}")
                 except Exception as e:
                     logger.error(
-                        f"保存最佳模型到 {best_model_path} 時失敗: {e}", exc_info=True)
+                        f"保存模型到 {current_model_path} 時失敗: {e}", exc_info=True)
 
-        # --- 定期保存檢查點 --- (可選，保留之前的邏輯)
+            # <<< 新增: 打印當前 Top K 信息 >>>
+            if top_k_models:
+                top_scores_str = ", ".join([f"Epoch {e} (ARI:{s:.4f})" for s, e, p in sorted(
+                    top_k_models, key=lambda x: x[0], reverse=True)])
+                logger.info(f"當前 Top {len(top_k_models)} 模型: {top_scores_str}")
+
+        # --- 定期保存檢查點 --- (邏輯不變)
         if (epoch + 1) % args.save_freq == 0 or epoch == args.epochs - 1:
             save_dir = os.path.join(args.output_dir, 'result')
             os.makedirs(save_dir, exist_ok=True)
@@ -517,8 +552,15 @@ def main(args):
     total_train_time = time.time() - start_train_time
     logger.info(
         f"訓練完成！總耗時: {time.strftime('%H:%M:%S', time.gmtime(total_train_time))}")
-    if best_epoch != -1:
-        logger.info(f"最佳模型出現在 Epoch {best_epoch}，對應的驗證集 ARI 為 {best_ari:.4f}")
+    # <<< 修改結束日誌 >>>
+    if top_k_models:
+        logger.info("--- 最終 Top K 模型 (按 ARI 排序) ---")
+        for ari, epoch_num, path in sorted(top_k_models, key=lambda x: x[0], reverse=True):
+            logger.info(
+                f"  Epoch {epoch_num}: ARI = {ari:.4f}, Path = {os.path.basename(path)}")  # 只顯示文件名
+    # <<< 移除舊的 Best ARI 打印 >>>
+    # if best_epoch != -1:
+    #     logger.info(f"最佳模型出現在 Epoch {best_epoch}，對應的驗證集 ARI 為 {best_ari:.4f}")
 
 
 if __name__ == '__main__':
@@ -551,13 +593,16 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int,
                         default=4, help='數據加載線程數 (根據 CPU 核數調整)')
     parser.add_argument('--save_freq', type=int,
-                        default=20, help='模型保存頻率 (epochs)')
+                        default=20, help='模型檢查點保存頻率 (epochs)')  # Checkpoint saving
     parser.add_argument('--seed', type=int, default=42, help='隨機種子')
     parser.add_argument('--cpu', action='store_true', help='強制使用 CPU')
     parser.add_argument('--eval_split', type=float,
                         default=0.15, help='驗證集劃分比例')
     parser.add_argument('--eval_freq', type=int,
                         default=5, help='評估頻率 (epochs)')
+    # <<< 新增參數 >>>
+    parser.add_argument('--save_top_k', type=int, default=1,
+                        help='保存驗證集 ARI 表現最好的 K 個模型 (設為 0 則不根據 ARI 保存最佳模型)')
 
     args = parser.parse_args()
 

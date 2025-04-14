@@ -87,21 +87,33 @@ cython_debug/
 # VS Code settings
 .vscode/
 
-# Generated/Data directories
-data/
-capture/
-clustered_tiles/
-sliced_tiles_test/
-trainer/clustering/result/
-
-# Image files
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.bmp
-*.tiff
-*.tif
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
 
 # Logs
-*.log 
+*.log
+logs/
+*.log.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# --- Project Specific ---
+
+# User-generated data and captured images
+capture/
+data/
+
+# Output directories from tools/scripts
+clustered_tiles/
+sliced_tiles_test/
+test_inference/
+
+# Trainer output (models, logs)
+trainer/clustering/result/
+trainer/classification/results/
+*.pth
+
+# IDE / Editor specific files (add more if needed)
+*.idea/ 
