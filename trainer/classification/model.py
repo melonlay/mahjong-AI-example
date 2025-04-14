@@ -1,3 +1,33 @@
+"""
+定義用於麻將牌分類的簡單卷積神經網絡 (CNN) 模型。
+
+此模組包含 `SimpleMahjongCNN` 類，繼承自 `torch.nn.Module`。
+模型結構包括：
+- 三個卷積層 (Conv2d)，每個後面跟著批次標準化 (BatchNorm2d)、ReLU 激活函數和最大池化層 (MaxPool2d)。
+- 兩個全連接層 (Linear)，中間有一個 Dropout 層用於正則化。
+- 自動計算卷積層輸出到第一個全連接層輸入的特徵數量 (`_determine_fc_input_size`)。
+
+用法:
+由訓練 (`train.py`)、評估 (`eval.py`) 和推論 (`infer_and_organize.py`) 腳本導入和實例化。
+
+- 在訓練/評估/推論腳本中:
+  ```python
+  from trainer.classification.model import SimpleMahjongCNN
+
+  num_classes = 30 # 假設包含 noise 共 30 類
+  input_size = 96 # 假設輸入圖片尺寸為 96x96
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+  model = SimpleMahjongCNN(num_classes=num_classes, input_size=input_size).to(device)
+
+  # 加載數據和權重...
+  # output = model(input_batch)
+  ```
+也可以直接運行此文件來打印模型結構和參數信息:
+```bash
+python trainer/classification/model.py
+```
+"""
 # trainer/classification/model.py
 import torch
 import torch.nn as nn

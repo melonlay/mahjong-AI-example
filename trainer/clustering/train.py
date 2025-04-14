@@ -1,19 +1,72 @@
 """
-實現麻將牌特徵提取模型的訓練流程。
+使用監督式對比學習 (Supervised Contrastive Learning, SupCon) 訓練麻將牌圖像的特徵提取模型。
 
 功能:
-- 解析命令行參數 (例如數據路徑、學習率、批次大小等)。
-- 設置隨機種子、設備 (CPU/GPU)。
-- 創建數據加載器 (DataLoader)，可能使用自訂的 Dataset (來自 dataset.py) 和數據增強。
-- 實例化模型 (來自 model.py) 和優化器 (例如 Adam)。
-- 實現訓練循環 (training loop)，計算損失 (例如 SupConLoss)。
-- 可能包含驗證循環 (validation loop)，計算評估指標 (例如 ARI, NMI)。
-- 定期保存模型檢查點 (checkpoint) 和最佳模型。
-- 使用 TensorBoard 或類似工具進行日誌記錄。
+1.  **參數解析**: 使用 `argparse` 解析命令行參數，配置訓練過程，包括:
+    - 數據目錄 (`--data_dir`)
+    - 輸出目錄 (`--output_dir`)，保存模型檢查點和 TensorBoard 日誌
+    - 訓練超參數：輪數 (`--epochs`)、批次大小 (`--batch_size`)、學習率 (`--lr`),
+      權重衰減 (`--weight_decay`)、SupCon 溫度參數 (`--temperature`)
+    - 模型參數：嵌入維度 (`--embedding_dim`)
+    - 數據加載：輸入圖像尺寸 (`--image_size`)、工作線程數 (`--num_workers`)
+    - 系統設置：隨機種子 (`--seed`)、是否使用 CUDA (`--no_cuda`)
+    - 驗證與保存：驗證頻率 (`--eval_freq`)、驗證集比例 (`--eval_split`),
+      模型保存頻率 (`--save_freq`)
+2.  **環境設置**: 設置隨機種子、確定運行設備 (CPU 或 CUDA GPU)、創建輸出目錄。
+3.  **數據加載**: 
+    - 定義 `TwoCropTransform` 類，用於為每個圖像生成兩個隨機增強的視圖。
+    - 定義 `get_contrastive_transforms` 函數，生成適用於對比學習的轉換流水線。
+    - 定義 `MahjongContrastiveDataset` 類，繼承自 `ImageFolder`，返回兩個增強視圖和標籤。
+    - 定義 `collate_fn_filter_corrupt` 函數，用於在 DataLoader 中過濾掉加載失敗的圖像。
+    - 創建訓練 DataLoader (`train_loader`)，使用 `MahjongContrastiveDataset` 和 `TwoCropTransform`。
+    - 創建用於聚類評估的 DataLoader (`eval_loader`)，使用標準的 `ImageFolder` 和非增強轉換。
+4.  **模型與損失函數**: 
+    - 初始化 `model.py` 中定義的 `SupConResNet` 模型。
+    - 初始化 `SupConLoss` 作為損失函數。
+5.  **優化器與混合精度**: 
+    - 初始化 Adam 優化器。
+    - 初始化 `GradScaler` 用於自動混合精度 (AMP) 訓練，以加速訓練並節省顯存。
+6.  **訓練循環**: 
+    - 遍歷指定的 `epochs`。
+    - 在每個 epoch 中，遍歷 `train_loader` 的批次數據。
+    - 使用 `autocast` 執行混合精度的前向傳播和損失計算。
+    - 使用 `GradScaler` 進行反向傳播和優化器步驟。
+    - 記錄訓練損失到 TensorBoard。
+7.  **聚類評估**: 
+    - 定期 (根據 `--eval_freq`) 執行 `evaluate_clustering` 函數。
+    - `evaluate_clustering` 函數：
+        - 將模型設置為評估模式 (`eval()`)。
+        - 使用 `eval_loader` 加載驗證數據。
+        - 使用模型的 `get_features` 方法提取圖像的原始特徵向量 (投影頭之前)。
+        - 使用 KMeans 算法對提取的特徵進行聚類。
+        - 計算聚類結果與真實標籤之間的 Adjusted Rand Index (ARI) 和 
+          Normalized Mutual Information (NMI) 指標。
+        - 將 ARI 和 NMI 指標記錄到 TensorBoard。
+        - 保存當前 ARI 指標最高的模型檢查點到 `result/` 目錄。
+8.  **模型保存**: 定期 (根據 `--save_freq`) 保存包含模型狀態、優化器狀態等的完整檢查點。
 
 用法:
-從命令行運行以開始訓練:
-  python trainer/clustering/train.py --data_dir ./data --output_dir ./trainer/clustering [其他參數...]
+作為一個命令行工具直接運行以開始訓練。
+```bash
+# 假設數據在 ./data 目錄，輸出到 trainer/clustering/result 目錄
+python trainer/clustering/train.py \
+    --data_dir ./data \
+    --output_dir trainer/clustering \
+    --epochs 200 \
+    --batch_size 256 \
+    --lr 0.0005 \
+    --embedding_dim 128 \
+    --temperature 0.1 \
+    --image_size 96 \
+    --num_workers 8 \
+    --eval_freq 10 \
+    --save_freq 50 \
+    --seed 42
+```
+訓練過程中可以使用 TensorBoard 查看訓練損失、ARI 和 NMI 指標:
+```bash
+tensorboard --logdir trainer/clustering/tensorboard_logs
+```
 """
 
 import os
@@ -37,125 +90,17 @@ from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 from torch.cuda.amp import GradScaler, autocast
 
 # 從同目錄下的 model.py 導入模型
-from model import SupConResNet
+from .model import SupConResNet
+from trainer.clustering.losses import SupConLoss
 
 # --- 設定 Logging ---
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Supervised Contrastive Loss (基本實現) ---
-
-
-class SupConLoss(nn.Module):
-    """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
-       (基本實現，可能缺少一些邊界情況處理或優化)
-    """
-
-    def __init__(self, temperature=0.07, contrast_mode='all', base_temperature=0.07):
-        super(SupConLoss, self).__init__()
-        self.temperature = temperature
-        self.contrast_mode = contrast_mode
-        self.base_temperature = base_temperature
-
-    def forward(self, features, labels=None, mask=None):
-        """計算 SupCon loss
-        Args:
-            features: hidden vector of shape [bsz, n_views, ...].
-            labels: ground truth of shape [bsz].
-            mask: contrastive mask of shape [bsz, bsz], mask_{i,j}=1 if sample j
-                has the same class as sample i. Can be asymmetric.
-        Returns:
-            A loss scalar.
-        """
-        device = (torch.device('cuda')
-                  if features.is_cuda
-                  else torch.device('cpu'))
-
-        if len(features.shape) < 3:
-            raise ValueError('`features` needs to be [bsz, n_views, ...],'
-                             'at least 3 dimensions are required')
-        if len(features.shape) > 3:
-            features = features.view(features.shape[0], features.shape[1], -1)
-
-        batch_size = features.shape[0]
-        if labels is not None and mask is not None:
-            raise ValueError('Cannot define both `labels` and `mask`')
-        elif labels is None and mask is None:
-            # 如果沒有標籤和 mask，則退化為自監督對比學習 (SimCLR)
-            # 但在此場景下我們期望有標籤
-            logger.warning("未提供 labels 或 mask 給 SupConLoss，將使用自對比 mask！")
-            mask = torch.eye(batch_size, dtype=torch.float32).to(device)
-        elif labels is not None:
-            labels = labels.contiguous().view(-1, 1)
-            if labels.shape[0] != batch_size:
-                raise ValueError(
-                    'Num of labels does not match num of features')
-            mask = torch.eq(labels, labels.T).float().to(device)
-        else:
-            mask = mask.float().to(device)
-
-        contrast_count = features.shape[1]  # n_views
-        contrast_feature = torch.cat(torch.unbind(
-            features, dim=1), dim=0)  # (bsz * n_views, dim)
-
-        if self.contrast_mode == 'one':
-            anchor_feature = features[:, 0]  # (bsz, dim)
-            anchor_count = 1
-        elif self.contrast_mode == 'all':
-            anchor_feature = contrast_feature  # (bsz * n_views, dim)
-            anchor_count = contrast_count
-        else:
-            raise ValueError('Unknown mode: {}'.format(self.contrast_mode))
-
-        # compute logits: (anchor_count * bsz, contrast_count * bsz)
-        anchor_dot_contrast = torch.div(
-            torch.matmul(anchor_feature, contrast_feature.T),
-            self.temperature)
-
-        # for numerical stability
-        logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
-        logits = anchor_dot_contrast - logits_max.detach()
-
-        # tile mask: (anchor_count * bsz, contrast_count * bsz)
-        mask = mask.repeat(anchor_count, contrast_count)
-
-        # mask-out self-contrast cases (對角線元素)
-        logits_mask = torch.scatter(
-            torch.ones_like(mask),
-            1,
-            torch.arange(batch_size * anchor_count).view(-1, 1).to(device),
-            0
-        )
-        mask = mask * logits_mask  # 保留非對角線的相同類別樣本
-
-        # compute log_prob
-        exp_logits = torch.exp(logits) * logits_mask  # 分母只計算非自身的樣本
-        # 加 epsilon 防 log(0)
-        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True) + 1e-9)
-
-        # compute mean of log-likelihood over positive samples
-        mask_sum = mask.sum(1)
-        # 避免除以零 (如果某個樣本沒有正樣本對，雖然理論上不應發生在 SupCon)
-        valid_mask_indices = torch.where(mask_sum > 0)[0]
-
-        if valid_mask_indices.shape[0] == 0:
-            # 如果整個批次都沒有正樣本對 (例如 batch size 太小或類別太少且抽樣不均)
-            logger.warning("此批次中沒有有效的正樣本對！ Loss 將為 0。")
-            return torch.tensor(0.0, device=device, requires_grad=True)
-
-        # 只計算有正樣本的行的 loss
-        mean_log_prob_pos = (
-            mask[valid_mask_indices] * log_prob[valid_mask_indices]).sum(1) / mask_sum[valid_mask_indices]
-
-        # loss
-        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
-        loss = loss.mean()  # 對批次中的有效樣本取平均
-
-        return loss
-
-
 # --- 帶雙視圖輸出的 Dataset ---
+
+
 class MahjongContrastiveDataset(datasets.ImageFolder):
     """繼承 ImageFolder，但在 __getitem__ 中返回兩個視圖和標籤"""
 

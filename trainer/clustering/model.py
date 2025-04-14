@@ -1,16 +1,37 @@
 """
-定義用於麻將牌特徵提取的卷積神經網路 (CNN) 模型架構。
+定義用於監督式對比學習 (Supervised Contrastive Learning, SupCon) 的
+基於 ResNet 的特徵提取模型。
 
-功能:
-- 通常基於一個預訓練模型架構 (例如 ResNet18)。
-- 修改模型以適應對比學習 (SupCon) 或其他特定任務，例如移除最後的分類層，添加投影頭 (projection head)。
-- 定義模型的前向傳播邏輯。
+此模組包含 `SupConResNet` 類，繼承自 `torch.nn.Module`。
+模型結構包括：
+- 一個基於預訓練 ResNet18 的編碼器 (encoder)，移除其原始的分類頭 (`fc` 層)。
+- 一個投影頭 (projection_head)，由兩個線性層和一個 ReLU 激活函數組成，
+  將編碼器輸出的特徵映射到一個低維度的嵌入空間 (由 `embedding_dim` 控制)。
+
+主要方法:
+- `forward(x)`: 執行完整的前向傳播，通過編碼器和投影頭，
+  最後返回 L2 歸一化 (normalized) 的嵌入向量。這些歸一化的嵌入向量
+  主要用於在訓練階段計算 SupCon 損失。
+- `get_features(x)`: 只執行編碼器部分的前向傳播，返回投影頭之前的原始特徵向量。
+  此方法主要用於模型訓練完成後，在聚類或下游任務中提取圖像的特徵表示。
 
 用法:
-由訓練腳本 (train.py) 導入並實例化模型。
-  from trainer.clustering.model import SupConResNet # 假設模型名
+主要由聚類模型的訓練腳本 (`trainer/clustering/train.py`) 導入和實例化。
+```python
+from trainer.clustering.model import SupConResNet
 
-  model = SupConResNet(embedding_dim=128)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = SupConResNet(embedding_dim=128).to(device)
+
+# 在訓練循環中:
+# (view1, view2), _ = batch
+# inputs = torch.cat([view1, view2], dim=0).to(device)
+# normalized_embeddings = model(inputs) # 用於計算 SupCon Loss
+
+# 在推理/聚類前:
+# features = model.get_features(single_image_batch) # 獲取用於聚類的特徵
+```
+此文件本身不能直接運行以產生功能。
 """
 
 import torch

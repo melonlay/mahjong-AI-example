@@ -41,25 +41,27 @@ This tool aims to demonstrate using AI technology for automatic analysis of capt
 │   └── interactive_tile_slicer.py # Interactive tile slicing tool
 ├── trainer/
 │   ├── clustering/       # Clustering model training related
+│   │   ├── losses.py     # Clustering loss function definitions (e.g., SupConLoss)
 │   │   ├── model.py      # CNN model definition for clustering (e.g., SupConResNet)
 │   │   ├── train.py      # Script to train the clustering feature extraction model
 │   │   └── result/       # Stores clustering model training results
 │   │       └── ... .pth    # Trained clustering model weights
 │   └── classification/   # Classification model training related
-│       ├── model.py      # CNN model definition for classification (e.g., SimpleMahjongCNN)
 │       ├── dataset.py    # Classification dataset handling
-│       ├── train.py      # Script to train the classification model
 │       ├── eval.py       # Script to evaluate the classification model
+│       ├── model.py      # CNN model definition for classification (e.g., SimpleMahjongCNN)
+│       ├── train.py      # Script to train the classification model
 │       └── results/      # Stores classification model training results
 │           ├── logs/       # TensorBoard logs
 │           └── models/     # Trained classification model weights
 │               └── ... .pth
+├── .gitignore            # Specifies files/directories Git should ignore
+├── LICENSE               # Project license file
 ├── main.py               # Main application entry point, launches the GUI for assisted image collection etc.
 ├── README.md             # This documentation file (Chinese)
 └── README_en.md          # English version documentation file
-# --- The following files usually exist but were not shown by list_dir, manual check/addition recommended ---
+# --- requirements.txt usually exists but was not shown by list_dir, manual check/addition recommended ---
 # ├── requirements.txt      # Lists required Python dependencies for the project
-# ├── .gitignore            # Specifies files/directories Git should ignore
 ```
 
 ## Complete Workflow from Scratch
@@ -104,18 +106,20 @@ The goal of this step is to start with completely unlabeled images and use a **p
 Using the first version of the `./data/` dataset created in the previous step, train your first **custom clustering feature extraction model** (using Supervised Contrastive Learning). The goal of this model is to learn a good feature space where Mahjong tiles of the same class are closer together.
 
 1.  **Run Clustering Training Script**: Ensure `--data_dir` points to your organized `./data` directory.
+    *   **Important**: Due to internal package imports, make sure to run from the **project root directory** using `python -m`.
     ```bash
-    # Recommended to run from the project root directory
-    python trainer/clustering/train.py --data_dir ./data --output_dir trainer/clustering --epochs 100 --batch_size 128 --lr 5e-4 --save_top_k 3 [other_parameters...]
+    # Must run from the project root directory
+    python -m trainer.clustering.train --data_dir ./data --output_dir trainer/clustering --epochs 100 --batch_size 128 --lr 5e-4 --save_top_k 3 --num_workers 4 [other_parameters...]
     ```
     *   `--data_dir ./data`: Specifies the directory containing the classified training images.
-    *   `--output_dir trainer/clustering`: Specifies the directory to save training logs and model files.
+    *   `--output_dir trainer/clustering`: Specifies the directory to save training logs and model files. Results will be saved in the `result/` subdirectory within this directory (e.g., `trainer/clustering/result/`).
     *   `--epochs 100`: Number of training epochs (SupCon might need more).
     *   `--batch_size 128`: Batch size (contrastive learning often benefits from larger batches).
     *   `--lr 5e-4`: Learning rate.
     *   `--save_top_k 3`: Saves the top 3 models based on the validation set ARI metric (adjustable).
+    *   `--num_workers 4`: Number of data loading workers. **Hint**: This value isn't always "the more, the better." It's recommended to experiment with different values (e.g., 0, 2, 4, 8...) based on your CPU cores and memory size to find the optimal training speed. Too high a value can sometimes slow down training due to process management overhead.
     *   *(Check the `trainer/clustering/train.py` script for more available parameters)*
-2.  **Obtain Custom Clustering Model**: After training completes, the top K performing models will be saved in the `trainer/clustering/result/` directory, with filenames like `model_epoch_XX_ari_Y.YYYY.pth`.
+2.  **Obtain Custom Clustering Model**: After training completes, the top K performing models will be saved in the `result/` subdirectory under the directory specified by `--output_dir`, with filenames like `model_epoch_XX_ari_Y.YYYY.pth`.
 
 **Purpose of this step:** Generate the first **feature extractor** optimized for Mahjong tiles based on the preliminarily organized data. Although the training data might not be perfect yet, the features learned by this model are generally more suitable for subsequent Mahjong tile clustering tasks than the generic ResNet18.
 
@@ -166,14 +170,14 @@ After ensuring that the `./data/` directory contains training data with accurate
     python -m trainer.classification.train --data_dir ./data --output_dir trainer/classification/results --epochs 50 --batch_size 128 --lr 0.001 --save_top_k 3 --num_workers 4
     ```
     *   `--data_dir ./data`: Specifies the directory containing the classified training images.
-    *   `--output_dir trainer/classification/results`: Specifies the directory to save training logs and model files.
+    *   `--output_dir trainer/classification/results`: Specifies the directory to save training logs and model files. Results will be saved in the `models/` and `logs/` subdirectories within this directory.
     *   `--epochs 50`: Number of training epochs (adjustable).
     *   `--batch_size 128`: Batch size (adjust based on GPU memory).
     *   `--lr 0.001`: Learning rate.
     *   `--save_top_k 3`: Saves the top 3 models with the highest validation accuracy (adjustable).
-    *   `--num_workers 4`: Number of data loading workers.
+    *   `--num_workers 4`: Number of data loading workers. **Hint**: Similar to clustering training, experimental adjustment based on hardware is recommended.
     *   *(Check the `trainer/classification/train.py` script for more available parameters)*
-3.  **Obtain Classification Model**: After training completes, the top K performing models will be saved in the `trainer/classification/results/models/` directory, with filenames like `model_epoch_XX_acc_Y.YYYY.pth`.
+3.  **Obtain Classification Model**: After training completes, the top K performing models will be saved in the `models/` subdirectory under the directory specified by `--output_dir`, with filenames like `model_epoch_XX_acc_Y.YYYY.pth`.
 
 **Purpose of this step:** Train a supervised learning model capable of making explicit class predictions for input Mahjong tile images (or non-Mahjong images). This model is the basis for subsequent automatic classification, inference, and organization tasks.
 

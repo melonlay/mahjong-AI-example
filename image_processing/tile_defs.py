@@ -1,15 +1,21 @@
 """
-定義與麻將牌相關的常量、枚舉或數據結構。
+定義麻將牌相關的常量和數據結構。
 
-功能:
-- 可能包含牌的種類列表、數值映射、尺寸常量等。
-- 提供項目中其他模組一致的牌定義參考。
+此模組用於集中管理項目中關於麻將牌的固定定義，
+例如牌的種類、名稱、可能的尺寸常量等。
+目的是提供一個統一的、一致的參考點，供其他模組（如訓練、分類、GUI）使用。
+
+目前此文件是個佔位符，未來可以根據需要添加實際的定義。
 
 用法:
-在需要引用牌定義的地方導入。
-  from image_processing.tile_defs import TILE_TYPES, TILE_WIDTH # 假設的常量
+當需要引用麻將牌的標準定義時，從此模組導入。
+```python
+# 假設未來定義了這些常量:
+# from image_processing.tile_defs import ALL_TILE_NAMES, STANDARD_TILE_HEIGHT
 
-  print(f"總共有 {len(TILE_TYPES)} 種牌")
+# print("所有牌的名稱:", ALL_TILE_NAMES)
+```
+此文件本身不能直接運行以產生功能。
 """
 
 # 暫時留空，後續會加入牌的定義

@@ -1,18 +1,32 @@
 """
-執行麻將牌圖像聚類的核心腳本。
+對 `capture/` 目錄下的麻將牌圖像執行聚類。
 
-功能:
-- 讀取 `capture/` 目錄下的待分類圖片。
-- 優先嘗試加載自訂訓練的 CNN 模型 (來自 trainer/clustering/result/) 提取特徵。
-- 如果自訂模型加載失敗，則使用備選方法 (預訓練 ResNet18 + HSV 顏色直方圖) 提取特徵。
-- 使用凝聚聚類 (Agglomerative Clustering) 算法對提取的特徵進行聚類。
-- 將 `capture/` 目錄下的圖片根據聚類結果複製到 `clustered_tiles/` 下的對應簇子目錄中。
+主要功能:
+1.  讀取 `capture/` 目錄中的所有圖像文件。
+2.  優先嘗試從 `--model_path` 參數指定的路徑加載自訂訓練的聚類特徵提取模型。
+3.  如果自訂模型加載成功，使用該模型提取圖像特徵。
+4.  如果無法加載自訂模型（未提供路徑、文件不存在或加載失敗），則自動回退 (Fallback)
+    到使用預訓練的 ResNet18 模型提取 CNN 特徵，並結合計算的 HSV 顏色直方圖作為補充特徵。
+5.  對提取出的特徵向量進行標準化 (StandardScaler)。
+6.  使用凝聚聚類 (Agglomerative Clustering) 算法對標準化後的特徵進行聚類。
+7.  根據聚類結果，將 `capture/` 目錄下的原始圖像複製到 `clustered_tiles/` 目錄下
+    對應的簇子目錄 (例如 `cluster_00`, `cluster_01`, ...) 中。
 
 用法:
-直接運行此腳本以執行聚類:
-  python tools/cluster_captured_tiles.py
+直接運行此腳本。可以選擇性地提供自訂模型路徑。
 
-(注意: 運行前確保 `capture/` 目錄有圖片。如果希望使用自訂模型，需先完成訓練步驟)
+- 使用預設回退方法 (ResNet18 + Color):
+  ```bash
+  python tools/cluster_captured_tiles.py
+  ```
+
+- 使用自訂訓練的聚類模型:
+  ```bash
+  # 將 <path_to_your_model.pth> 替換為實際模型檔案路徑
+  python tools/cluster_captured_tiles.py --model_path trainer/clustering/result/your_model.pth
+  ```
+
+(運行前請確保 `capture/` 目錄中有待聚類的圖片)
 
 依賴項:
   - opencv-python

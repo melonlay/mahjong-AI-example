@@ -1,4 +1,56 @@
 # trainer/classification/train.py
+"""
+訓練麻將牌圖像分類模型的腳本。
+
+功能:
+1.  接收命令行參數，用於配置訓練過程，包括：
+    - 數據目錄 (`--data_dir`)
+    - 輸出目錄 (`--output_dir`)，用於保存模型和 TensorBoard 日誌
+    - 訓練超參數：輪數 (`--epochs`)、批次大小 (`--batch_size`)、學習率 (`--lr`),
+      權重衰減 (`--weight_decay`)、學習率衰減步長和因子 (`--lr_step_size`, `--lr_gamma`)
+    - 驗證集比例 (`--val_split`)
+    - 模型輸入尺寸 (`--input_size`)
+    - 系統設置：工作線程數 (`--num_workers`)、隨機種子 (`--seed`)
+    - 模型保存：保存最佳 K 個模型的數量 (`--save_top_k`)
+    - 日誌記錄間隔 (`--log_interval`)
+2.  設置隨機種子以保證可復現性。
+3.  確定運行設備 (CPU 或 CUDA GPU)。
+4.  創建輸出目錄 (用於模型和 TensorBoard 日誌)。
+5.  初始化 TensorBoard 的 `SummaryWriter`。
+6.  使用 `dataset.py` 中的 `get_dataloaders` 函數創建訓練和驗證 DataLoader。
+7.  初始化分類模型 (`model.py` 中的 `SimpleMahjongCNN`)。
+8.  初始化損失函數 (CrossEntropyLoss)、優化器 (AdamW) 和學習率調度器 (StepLR)。
+9.  執行主訓練循環 (`args.epochs` 輪)：
+    - 調用 `train_one_epoch` 函數訓練一個 epoch。
+    - 調用 `eval.py` 中的 `evaluate_model` 函數在驗證集上評估模型。
+    - 更新學習率調度器。
+    - 記錄訓練和驗證的損失與準確率到 TensorBoard。
+    - 根據驗證集準確率，保存排名前 `args.save_top_k` 的模型檢查點到模型目錄中。
+      - 檢查點包含模型狀態、優化器狀態、輪數、類別名稱、輸入尺寸等信息。
+      - 自動刪除不再是 Top K 的舊模型文件。
+10. 訓練結束後，打印總耗時和最佳模型的驗證準確率。
+
+用法:
+作為一個命令行工具直接運行。
+```bash
+# 假設數據在 ./data 目錄，輸出到 trainer/classification/results 目錄
+python trainer/classification/train.py \
+    --data_dir ./data \
+    --output_dir trainer/classification/results \
+    --epochs 50 \
+    --batch_size 128 \
+    --lr 0.001 \
+    --weight_decay 1e-4 \
+    --input_size 96 \
+    --save_top_k 3 \
+    --num_workers 4 \
+    --seed 42
+```
+訓練過程中可以使用 TensorBoard 查看損失和準確率曲線:
+```bash
+tensorboard --logdir trainer/classification/results/logs
+```
+"""
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import StepLR
 import torch.optim as optim

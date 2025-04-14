@@ -1,18 +1,26 @@
 """
-定義 GUI 中的控制面板組件。
+定義應用程式 GUI 中的控制面板區域。
 
-功能:
-- 包含應用程式的控制按鈕、設定選項、滑塊、狀態顯示等。
-- 提供使用者與應用程式互動的介面。
-- 將使用者操作（例如點擊按鈕）轉換為對後端功能的調用請求。
+此模組包含 `ControlPanelFrame` 類，該類是一個 `ttk.Frame` 子類，
+負責顯示控制按鈕（開始/停止偵測、擷取手牌）、狀態標籤以及
+將使用者操作連接到應用程式主邏輯的回呼函數。
 
 用法:
-通常被 MainWindow 實例化並嵌入到主視窗佈局中。
-  from gui.control_panel import ControlPanel
+主要由 `gui.main_window.MainWindow` 實例化並嵌入其佈局中。
+```python
+from gui.control_panel import ControlPanelFrame
 
-  # 在 MainWindow 的 __init__ 中:
-  # self.control_panel = ControlPanel(self.root, self.controller)
-  # self.control_panel.pack(...)
+# 在 MainWindow 的 __init__ 中:
+# self.control_panel = ControlPanelFrame(self.left_frame, # 或其他父容器
+#                                      start_callback=self.app_controller.start_capture,
+#                                      stop_callback=self.app_controller.stop_capture,
+#                                      capture_hand_callback=self.app_controller.capture_hand_to_files)
+# self.control_panel.pack(...)
+```
+也可以直接運行此文件進行簡單的單元測試:
+```bash
+python gui/control_panel.py
+```
 """
 import tkinter as tk
 from tkinter import ttk

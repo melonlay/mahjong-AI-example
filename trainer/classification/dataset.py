@@ -8,6 +8,56 @@ import logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
+"""
+定義用於分類模型訓練、驗證和評估的數據集和數據加載器。
+
+功能:
+- `get_transforms(input_size, augment)`: 根據是否為訓練階段 (augment=True)
+  返回包含圖像尺寸調整、數據增強 (可選) 和標準化的 PyTorch 轉換。
+- `get_dataloaders(data_dir, input_size, batch_size, val_split, ...)`:
+  從指定的 `data_dir` (應包含按類別命名的子目錄) 加載圖像數據。
+  使用 `ImageFolder` 創建數據集。
+  根據 `val_split` 比例將數據集劃分為訓練集和驗證集。
+  為訓練集應用數據增強轉換，為驗證集應用標準轉換。
+  返回訓練 DataLoader、驗證 DataLoader 和數據集中的類別名稱列表。
+- `get_eval_loader(data_dir, input_size, batch_size, ...)`:
+  從指定的 `data_dir` 加載圖像數據，創建一個用於評估的 DataLoader。
+  只應用標準的 (非增強) 轉換。
+  返回評估 DataLoader 和類別名稱列表。
+
+用法:
+主要由分類模型的訓練 (`trainer/classification/train.py`) 和評估 (`trainer/classification/eval.py`) 腳本導入。
+
+- 在訓練腳本中:
+  ```python
+  from trainer.classification.dataset import get_dataloaders
+
+  train_loader, val_loader, class_names = get_dataloaders(
+      data_dir='./data', 
+      input_size=96, 
+      batch_size=128, 
+      val_split=0.15
+  )
+  # ... 後續訓練循環 ...
+  ```
+
+- 在評估腳本中:
+  ```python
+  from trainer.classification.dataset import get_eval_loader
+
+  eval_loader, class_names = get_eval_loader(
+      data_dir='./path/to/test_data', 
+      input_size=96, 
+      batch_size=128
+  )
+  # ... 後續評估過程 ...
+  ```
+也可以直接運行此文件進行簡單的單元測試，它會嘗試從專案根目錄下的 `data` 目錄加載數據並打印信息:
+```bash
+python trainer/classification/dataset.py
+```
+"""
+
 # Define image transformations
 # Using ImageNet mean and std is a common starting point, even without pretraining
 # Alternatively, calculate mean/std from your specific dataset later for better results.

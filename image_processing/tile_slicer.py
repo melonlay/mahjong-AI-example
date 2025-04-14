@@ -1,19 +1,41 @@
 """
-從已定位的手牌區域 (ROI) 圖像中切割出單張麻將牌圖片。
+麻將牌圖像切割模組。
 
 功能:
-- 根據設定檔 (configs/tile_slicer_config.json) 中的參數 (例如牌的數量、間距、寬高等) 來切割 ROI。
-- 對切割出的單張牌圖片進行預處理 (例如縮放、去除背景)。
-- 提供函數以返回切割出的牌圖片列表。
+- 從輸入的手牌區域 (ROI) 圖像中，根據設定檔 (`configs/tile_slicer_config.json`) 
+  中預定義的邊界框 (bounding boxes) 切割出單張麻將牌。
+- 主要函數 `slice_hand_roi` 負責載入設定並執行切割操作。
+- 內部使用 `_load_tile_config` 函數來快取和載入 JSON 設定檔，並進行基本驗證。
+- 對於超出 ROI 範圍的邊界框會進行裁剪處理。
 
 用法:
-通常在獲取手牌 ROI 之後調用。
-  from image_processing.tile_slicer import slice_hand_roi
+在獲得手牌 ROI 圖像後調用，通常用於準備訓練數據或進行單牌分析。
+```python
+import cv2
+from image_processing.hand_detector import get_hand_roi
+from image_processing.tile_slicer import slice_hand_roi
 
-  # 假設 hand_roi_image 是從 get_hand_roi 獲得的圖像
-  # config 是從 tile_slicer_config.json 加載的設定
-  sliced_tiles = slice_hand_roi(hand_roi_image, config)
-  # sliced_tiles 是一個包含多張單牌圖像 (numpy array) 的列表
+screenshot = cv2.imread('full_game_screenshot.png')
+if screenshot is not None:
+    hand_roi = get_hand_roi(screenshot)
+    if hand_roi is not None:
+        tile_images = slice_hand_roi(hand_roi) # 從設定檔讀取切割座標
+        if tile_images:
+            print(f"成功切割出 {len(tile_images)} 張牌圖像。")
+            # 可以將 tile_images 用於後續處理，例如保存或傳遞給模型
+            # for i, tile in enumerate(tile_images):
+            #     cv2.imwrite(f'tile_{i+1}.png', tile)
+        else:
+            print("未能根據設定檔切割出手牌圖像。")
+    else:
+        print("無法偵測手牌區域。")
+else:
+    print("無法讀取截圖。")
+```
+也可以直接運行此文件進行簡單的單元測試 (需要相應的設定檔和上一層目錄的截圖):
+```bash
+python image_processing/tile_slicer.py
+```
 """
 import cv2
 import numpy as np

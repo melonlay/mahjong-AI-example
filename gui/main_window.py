@@ -1,19 +1,28 @@
 """
-定義主應用程式視窗 (GUI)。
+定義應用程式的主 GUI 視窗。
 
-功能:
-- 創建應用程式的主要視窗佈局，通常包含圖像顯示區域和控制面板。
-- 連接 UI 元素 (按鈕、滑塊等) 與後端功能 (例如螢幕擷取、圖像處理、模型執行等)。
-- 管理子視窗或對話框。
+此模組包含 `MainWindow` 類，該類繼承自 `tk.Tk`，構建了應用的主介面。
+它負責整合各個子組件，例如圖像顯示區域 (`gui.image_display.ImageDisplayFrame`)
+和控制面板 (`gui.control_panel.ControlPanelFrame`)，並將它們佈局在主視窗中。
+同時，它也提供了更新子組件狀態（如顯示圖像、狀態文字）的方法。
 
 用法:
-通常由 main.py 實例化並顯示:
-  import tkinter as tk
-  from gui.main_window import MainWindow
+主要由應用程式入口點 (`main.py` 或等效腳本) 實例化並啟動 Tkinter 主循環。
+```python
+from gui.main_window import MainWindow
 
-  root = tk.Tk()
-  app = MainWindow(root)
-  root.mainloop()
+app_controller = YourApplicationController() # 假設有一個控制器處理回呼
+
+main_app = MainWindow(title="My Mahjong AI",
+                      start_callback=app_controller.start,
+                      stop_callback=app_controller.stop,
+                      capture_hand_callback=app_controller.capture_hand)
+main_app.mainloop()
+```
+也可以直接運行此文件進行簡單的單元測試 (需要一個名為 `screenshot_printwindow.png` 的圖片在上一層目錄):
+```bash
+python gui/main_window.py
+```
 """
 import tkinter as tk
 from tkinter import ttk

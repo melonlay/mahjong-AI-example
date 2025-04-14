@@ -1,11 +1,40 @@
 """
-提供擷取特定視窗畫面內容的功能，特別針對遊戲視窗。
+提供跨平台的螢幕擷取功能，並特別針對 Windows 平台優化了特定視窗的擷取。
 
-主要使用 Windows API 的 PrintWindow 功能，以提高對使用非 GDI 渲染
-(如 DirectX, OpenGL) 的視窗的擷取準確性和可靠性。
+主要功能:
+- `IS_WINDOWS`: 布林值常量，指示當前是否在 Windows 上運行。
+- `capture_game_window(window_title, use_client_area)`: (僅限 Windows)
+  使用 WinAPI 的 `PrintWindow` 函數擷取指定標題視窗的內容。
+  `PrintWindow` 通常比傳統的 BitBlt 對於使用硬體加速渲染 (DirectX, OpenGL) 的視窗
+  (例如遊戲) 更有效、更可靠，且可以在視窗部分被遮擋時擷取。
+  參數:
+    - `window_title`: 要擷取的視窗的**精確**標題。
+    - `use_client_area`: 是否只擷取客戶區 (不含標題和邊框)，預設為 True (推薦)。
+  返回: 成功時返回 OpenCV BGR 格式的 NumPy 圖像陣列，失敗時返回 None。
 
-主要函式:
-    capture_game_window: 尋找指定標題的視窗並回傳其畫面內容 (OpenCV 格式)。
+用法:
+應用程式的主循環 (`main.py`) 或需要擷取遊戲畫面的其他工具可以導入並使用此模組。
+```python
+from image_utils.screen_capture import capture_game_window, IS_WINDOWS
+
+if IS_WINDOWS:
+    window_title = "麻雀一番街" # 替換為目標視窗標題
+    frame = capture_game_window(window_title, use_client_area=True)
+    if frame is not None:
+        # 成功擷取畫面
+        cv2.imshow("Captured Window", frame)
+        cv2.waitKey(1)
+    else:
+        print(f"無法擷取視窗 '{window_title}'")
+else:
+    print("非 Windows 系統，無法使用 capture_game_window。")
+```
+也可以直接運行此文件進行簡單的單元測試 (需要一個標題完全匹配的視窗正在運行):
+```bash
+# 假設遊戲視窗標題是 'My Game Window'
+# 需要先修改此文件 __main__ 部分的 window_title
+python image_utils/screen_capture.py
+```
 """
 import pygetwindow as gw
 import time

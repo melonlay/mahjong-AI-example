@@ -41,25 +41,27 @@
 │   └── interactive_tile_slicer.py # 互動式牌面切割工具
 ├── trainer/
 │   ├── clustering/       # 聚類模型訓練相關
+│   │   ├── losses.py     # 聚類損失函數定義 (例如 SupConLoss)
 │   │   ├── model.py      # 聚類用 CNN 模型定義 (例如 SupConResNet)
 │   │   ├── train.py      # 訓練聚類特徵提取模型的腳本
 │   │   └── result/       # 存放聚類模型訓練結果
 │   │       └── ... .pth    # 訓練好的聚類模型權重
 │   └── classification/   # 分類模型訓練相關
-│       ├── model.py      # 分類用 CNN 模型定義 (例如 SimpleMahjongCNN)
 │       ├── dataset.py    # 分類數據集處理
-│       ├── train.py      # 訓練分類模型的腳本
 │       ├── eval.py       # 評估分類模型的腳本
+│       ├── model.py      # 分類用 CNN 模型定義 (例如 SimpleMahjongCNN)
+│       ├── train.py      # 訓練分類模型的腳本
 │       └── results/      # 存放分類模型訓練結果
 │           ├── logs/       # TensorBoard 日誌
 │           └── models/     # 訓練好的分類模型權重
 │               └── ... .pth
+├── .gitignore            # 指定 Git 應忽略的檔案/目錄
+├── LICENSE               # 專案授權文件
 ├── main.py               # 主要應用程式入口，啟動 GUI 介面以輔助圖片收集等操作
 ├── README.md             # 本說明文件 (中文)
 └── README_en.md          # 英文版說明文件
-# --- 以下檔案通常存在，但 list_dir 未顯示，建議手動確認或添加 ---
+# --- requirements.txt 通常存在，但 list_dir 未顯示，建議手動確認或添加 ---
 # ├── requirements.txt      # 列出專案所需的 Python 依賴庫
-# ├── .gitignore            # 指定 Git 應忽略的檔案/目錄
 ```
 
 ## 從零開始的完整工作流程
@@ -104,18 +106,20 @@
 使用上一步創建的第一版 `./data/` 數據集，訓練您的第一個**自訂聚類特徵提取模型** (使用 Supervised Contrastive Learning)。這個模型的目標是學習一個好的特徵空間，使得相同類別的麻將牌在該空間中距離更近。
 
 1.  **運行聚類訓練腳本**: 確保 `--data_dir` 指向您整理好的 `./data` 目錄。
+    *   **重要**: 由於腳本內部使用了套件導入，請務必從**專案根目錄**執行，並使用 `python -m` 來啟動。
     ```bash
-    # 建議從專案根目錄運行
-    python trainer/clustering/train.py --data_dir ./data --output_dir trainer/clustering --epochs 100 --batch_size 128 --lr 5e-4 --save_top_k 3 [其他參數...]
+    # 務必從專案根目錄運行
+    python -m trainer.clustering.train --data_dir ./data --output_dir trainer/clustering --epochs 100 --batch_size 128 --lr 5e-4 --save_top_k 3 --num_workers 4 [其他參數...]
     ```
     *   `--data_dir ./data`: 指定包含已分類訓練圖片的目錄。
-    *   `--output_dir trainer/clustering`: 指定保存訓練日誌和模型文件的目錄。
+    *   `--output_dir trainer/clustering`: 指定保存訓練日誌和模型文件的目錄。訓練結果將保存在此目錄下的 `result/` 子目錄中 (例如 `trainer/clustering/result/`)。
     *   `--epochs 100`: 訓練輪數（SupCon 可能需要較多輪數）。
     *   `--batch_size 128`: 批次大小（對比學習通常需要較大批次）。
     *   `--lr 5e-4`: 學習率。
     *   `--save_top_k 3`: 保存驗證集 ARI 指標最高的 3 個模型（可調整）。
+    *   `--num_workers 4`: 數據加載線程數。**提示**: 此數值並非越大越好，建議根據您的 CPU 核心數和記憶體大小進行實驗性調整 (例如嘗試 0, 2, 4, 8...)，以找到最佳訓練速度。過高的值有時反而會因行程管理開銷而降低速度。
     *   *(查看 `trainer/clustering/train.py` 腳本獲取更多可用參數)*
-2.  **獲取自訂聚類模型**: 訓練完成後，表現最好的 K 個模型會保存在 `trainer/clustering/result/` 目錄下，文件名類似 `model_epoch_XX_ari_Y.YYYY.pth`。
+2.  **獲取自訂聚類模型**: 訓練完成後，表現最好的 K 個模型會保存在 `--output_dir` 指定目錄下的 `result/` 子目錄中，文件名類似 `model_epoch_XX_ari_Y.YYYY.pth`。
 
 **此步驟目的：** 基於初步整理的數據，生成第一個針對麻將牌進行優化的**特徵提取器**。雖然訓練數據可能還不完美，但這個模型學習到的特徵通常會比通用的 ResNet18 更適合用於後續的麻將牌聚類任務。
 
@@ -166,14 +170,14 @@
     python -m trainer.classification.train --data_dir ./data --output_dir trainer/classification/results --epochs 50 --batch_size 128 --lr 0.001 --save_top_k 3 --num_workers 4
     ```
     *   `--data_dir ./data`: 指定包含已分類訓練圖片的目錄。
-    *   `--output_dir trainer/classification/results`: 指定保存訓練日誌和模型文件的目錄。
+    *   `--output_dir trainer/classification/results`: 指定保存訓練日誌和模型文件的目錄。訓練結果將保存在此目錄下的 `models/` 和 `logs/` 子目錄中。
     *   `--epochs 50`: 訓練輪數（可調整）。
     *   `--batch_size 128`: 批次大小（可根據 GPU 記憶體調整）。
     *   `--lr 0.001`: 學習率。
     *   `--save_top_k 3`: 保存驗證準確率最高的 3 個模型（可調整）。
-    *   `--num_workers 4`: 數據加載線程數。
+    *   `--num_workers 4`: 數據加載線程數。**提示**: 與聚類訓練類似，建議根據硬體進行實驗性調整。
     *   *(查看 `trainer/classification/train.py` 腳本獲取更多可用參數)*
-3.  **獲取分類模型**: 訓練完成後，表現最好的 K 個模型會保存在 `trainer/classification/results/models/` 目錄下，文件名類似 `model_epoch_XX_acc_Y.YYYY.pth`。
+3.  **獲取分類模型**: 訓練完成後，表現最好的 K 個模型會保存在 `--output_dir` 指定目錄下的 `models/` 子目錄中，文件名類似 `model_epoch_XX_acc_Y.YYYY.pth`。
 
 **此步驟目的：** 訓練一個監督式學習模型，使其能夠對輸入的麻將牌圖片（或非麻將牌圖片）進行明確的類別預測。這個模型是後續進行自動分類、推論和整理任務的基礎。
 

@@ -1,22 +1,24 @@
 # find_roi_interactively.py
 """
-提供一個互動式工具，讓使用者可以在螢幕截圖上選擇感興趣區域 (ROI)。
+提供一個互動式介面，讓使用者可以在螢幕截圖上選擇手牌區域 (ROI)。
 
 功能:
-- 顯示螢幕截圖。
-- 允許使用者透過滑鼠拖拽或其他方式選定一個矩形區域。
-- 將選定的區域座標保存到設定檔 (例如 configs/roi_config.json)。
+- 加載預設的螢幕截圖 (`screenshot_printwindow.png`)。
+- 彈出一個包含截圖的視窗，讓使用者使用滑鼠拖拽來選定一個矩形區域。
+- 使用者確認選區後 (按下 Enter 或 Space)，將選定區域的左上角座標 (x, y)
+  及其寬高 (w, h) 保存到 `configs/roi_config.json` 檔案中。
+- 如果使用者取消操作 (按下 Esc)，則不保存。
 
 用法:
-直接運行此腳本以啟動互動式 ROI 選擇工具:
-  python tools/find_roi_interactively.py
+直接運行此腳本以啟動互動式 ROI 選擇工具。
+```bash
+python tools/find_roi_interactively.py
+```
+執行前，請確保專案根目錄下有名為 `screenshot_printwindow.png` 的螢幕截圖文件。
+此截圖應用於 `main.py` 運行擷取功能後產生，或者您可以手動放置一個代表性的截圖。
 
-執行方式:
-  python tools/find_roi_interactively.py
-
-其他模組如何使用:
-  - image_processing/hand_detector.py 模組會讀取此工具產生的
-    configs/roi_config.json 檔案來確定從遊戲畫面中提取哪一部分作為手牌區域。
+此工具產生的 `configs/roi_config.json` 文件會被 `image_processing/hand_detector.py` 
+模組讀取，用於在自動化流程中定位手牌區域。
 """
 import cv2
 import os

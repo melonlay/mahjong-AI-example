@@ -1,20 +1,36 @@
 """
-包含用於從螢幕截圖中檢測和定位手牌區域 (ROI) 的功能。
+手牌區域 (ROI) 偵測模組。
 
 功能:
-- 可能使用圖像處理技術 (例如顏色過濾、邊緣檢測、輪廓分析) 或機器學習模型來定位手牌區域。
-- 讀取 ROI 設定檔 (configs/roi_config.json)。
-- 提供函數以獲取手牌區域的邊界框 (bounding box)。
+- 從完整的螢幕截圖中，根據設定檔 (`configs/roi_config.json`) 提取手牌區域。
+- 主要函數 `get_hand_roi` 負責載入設定並從輸入圖像中裁剪出 ROI。
+- 內部使用 `_load_roi_config` 函數來快取和載入 JSON 設定檔。
 
 用法:
-可能被 GUI (例如用於初始設定 ROI) 或自動化流程調用。
-  from image_processing.hand_detector import get_hand_roi
+此模組通常被需要處理手牌圖像的其他模組調用，例如 GUI 的擷取功能或牌面切割工具。
+```python
+import cv2
+from image_processing.hand_detector import get_hand_roi
 
-  # 假設 screenshot 是 OpenCV 讀取的圖像
-  roi_rect = get_hand_roi(screenshot, config_path='configs/roi_config.json')
-  if roi_rect:
-      x, y, w, h = roi_rect
-      hand_image = screenshot[y:y+h, x:x+w]
+# 假設 screenshot_image 是 OpenCV 讀取的完整畫面 BGR 圖像
+screenshot_image = cv2.imread('full_screenshot.png')
+
+if screenshot_image is not None:
+    hand_roi_image = get_hand_roi(screenshot_image)
+    if hand_roi_image is not None:
+        # 成功提取 ROI，可以進行後續處理 (例如切割)
+        # ... process hand_roi_image ...
+        cv2.imshow("Hand ROI", hand_roi_image)
+        cv2.waitKey(0)
+    else:
+        print("未能從圖像中提取手牌 ROI。")
+else:
+    print("無法讀取截圖圖像。")
+```
+也可以直接運行此文件進行簡單的單元測試 (需要設定檔 `configs/roi_config.json` 和上一層目錄的 `screenshot_printwindow.png`):
+```bash
+python image_processing/hand_detector.py
+```
 """
 import numpy as np
 import cv2

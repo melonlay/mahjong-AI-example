@@ -1,21 +1,28 @@
 """
-定義 GUI 中的圖像顯示組件。
+定義應用程式 GUI 中的圖像顯示區域。
 
-功能:
-- 在 Tkinter 視窗中顯示圖像 (例如，擷取的螢幕畫面、處理後的結果)。
-- 可能包含縮放、平移或其他圖像交互功能。
-- 提供更新顯示圖像的接口。
+此模組包含 `ImageDisplayFrame` 類，該類是一個 `ttk.Frame` 子類，
+專門用於在 Tkinter 介面中展示圖像。
+它接收 OpenCV 格式的圖像 (NumPy BGR array)，將其轉換並顯示在一個 Label 元件中。
+提供 `update_image` 方法來動態更新顯示的內容。
 
 用法:
-通常被 MainWindow 實例化並嵌入到主視窗佈局中。
-  from gui.image_display import ImageDisplay
+主要由 `gui.main_window.MainWindow` 實例化並嵌入其佈局中。
+```python
+from gui.image_display import ImageDisplayFrame
 
-  # 在 MainWindow 的 __init__ 中:
-  # self.image_display = ImageDisplay(self.root)
-  # self.image_display.pack(...)
+# 在 MainWindow 的 __init__ 中:
+# self.image_display = ImageDisplayFrame(self.right_frame, initial_width=640, initial_height=360)
+# self.image_display.pack(fill=tk.BOTH, expand=True)
 
-  # 更新圖像:
-  # self.image_display.update_image(new_image)
+# 更新圖像 (例如從擷取線程):
+# new_cv_image = get_latest_frame()
+# self.image_display.update_image(new_cv_image)
+```
+也可以直接運行此文件進行簡單的單元測試 (需要一個名為 `screenshot_printwindow.png` 的圖片在上一層目錄):
+```bash
+python gui/image_display.py
+```
 """
 import tkinter as tk
 from tkinter import ttk

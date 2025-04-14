@@ -1,4 +1,45 @@
 # trainer/classification/eval.py
+"""
+評估已訓練好的麻將牌分類模型的腳本。
+
+功能:
+1.  接收命令行參數，包括模型檢查點路徑 (`--model_path`)、評估數據目錄 (`--data_dir`)，
+    以及可選的輸入尺寸、批次大小、類別數量等。
+2.  從指定路徑加載模型檢查點 (.pth)。
+    - 會嘗試從檢查點中讀取類別數量 (`class_names`)，如果沒有則需要用戶通過 `--num_classes` 指定，
+      或者嘗試從數據目錄推斷。
+    - 處理權重字典中可能的 `module.` 前綴。
+3.  創建一個用於評估的 DataLoader (`get_eval_loader` from `dataset.py`)，加載評估數據集。
+4.  初始化模型結構 (`SimpleMahjongCNN` from `model.py`) 並加載權重。
+5.  定義損失函數 (CrossEntropyLoss)。
+6.  調用 `evaluate_model` 函數在評估數據集上執行模型推論。
+7.  `evaluate_model` 函數計算並記錄:
+    - 平均損失 (Loss)
+    - 準確率 (Accuracy)
+    - 推論吞吐量 (samples/sec)
+8.  如果 `evaluate_model` 在訓練循環中被調用 (提供了 `epoch` 和 `writer`)，
+    它還可以將驗證損失和準確率寫入 TensorBoard。
+
+用法:
+作為一個命令行工具直接運行，用於評估一個已保存的模型檢查點。
+```bash
+# 假設模型保存在 trainer/classification/results/models/best_model.pth
+# 評估數據在 ./test_data 目錄 (包含類別子目錄)
+python trainer/classification/eval.py \
+    --model_path trainer/classification/results/models/best_model.pth \
+    --data_dir ./test_data \
+    --batch_size 128 \
+    --input_size 96 \
+    --num_workers 4
+```
+也可以被訓練腳本 (`train.py`) 導入，用於在訓練過程中定期評估模型在驗證集上的性能。
+```python
+# 在 train.py 中:
+# from trainer.classification.eval import evaluate_model
+# ...
+# val_loss, val_acc = evaluate_model(model, device, val_loader, criterion, epoch, writer)
+```
+"""
 import os
 import argparse
 import logging

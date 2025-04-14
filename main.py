@@ -1,14 +1,16 @@
 """
-主應用程式入口點。
+主應用程式入口點，用於啟動麻將牌 AI 圖像分析工具的 GUI。
 
 功能:
-- 初始化應用程式，例如設定 logging、加載設定。
-- 創建並顯示主 GUI 視窗 (來自 gui.main_window)。
-- 啟動應用程式的主事件循環。
+- 初始化應用程式，包括設定 logging 和加載設定檔。
+- 創建並顯示主 GUI 視窗 (`gui.main_window.MainWindow`)。
+- 啟動應用程式的主事件循環，處理用戶交互和背景任務（如螢幕擷取）。
 
 用法:
 直接運行此腳本以啟動整個應用程式:
+  ```bash
   python main.py
+  ```
 """
 from image_processing.tile_slicer import slice_hand_roi
 from image_processing.hand_detector import get_hand_roi

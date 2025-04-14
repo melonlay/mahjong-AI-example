@@ -10,6 +10,44 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 import time
 
+"""
+使用訓練好的分類模型對指定目錄中的圖像進行推論，並將圖像根據預測結果整理到不同的子目錄中。
+
+功能:
+1.  接收命令行參數，包括模型路徑 (`--model_path`)、輸入圖像目錄 (`--input_dir`)、
+    輸出目錄 (`--output_dir`) 以及其他推論相關參數 (批次大小、工作線程數等)。
+2.  從指定的模型檢查點文件 (`.pth`) 加載訓練好的分類模型 (SimpleMahjongCNN)。
+    - 會自動處理權重鍵名中可能存在的 'module.' 前綴。
+    - 從檢查點中讀取類別名稱 (`class_names`) 和輸入尺寸 (`input_size`)。
+3.  創建一個自訂的 `ImageFolderForInference` Dataset，用於從輸入目錄加載圖像。
+4.  使用 DataLoader 進行批次加載和預處理（使用與驗證時相同的轉換）。
+5.  對每個批次的圖像執行模型推論，獲得預測的類別索引。
+6.  將預測索引轉換為類別名稱。
+7.  清空並重新創建輸出目錄。
+8.  在輸出目錄下，為每個預測出的類別創建子目錄。
+9.  將輸入目錄中的每個原始圖像複製到輸出目錄下對應的預測類別子目錄中。
+10. 記錄處理的圖片數量和花費的時間。
+
+用法:
+作為一個命令行工具直接運行。
+```bash
+# 假設模型保存在 trainer/classification/results/models/best_model.pth
+# 待推論的圖片在 ./capture 目錄
+# 結果輸出到 ./inference_output 目錄
+python tools/infer_and_organize.py \
+    --model_path trainer/classification/results/models/best_model.pth \
+    --input_dir ./capture \
+    --output_dir ./inference_output \
+    --batch_size 64 \
+    --num_workers 4
+```
+
+注意:
+- `--input_dir` 中的圖像文件應該直接放在該目錄下，而不是放在子目錄中。
+- `--output_dir` 如果已存在，會被清空。
+- 需要 `trainer.classification.model` 和 `trainer.classification.dataset` 模組可用。
+"""
+
 # <<< 新增: 將專案根目錄添加到 sys.path >>>
 # 假設此腳本位於 <project_root>/tools/
 script_path = os.path.abspath(__file__)

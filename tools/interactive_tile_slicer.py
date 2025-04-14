@@ -1,31 +1,27 @@
 # tools/interactive_tile_slicer.py
 """
-提供一個互動式工具，用於調整和預覽牌面切割的效果。
+提供一個互動式工具，讓使用者透過滑鼠點擊來定義手牌 ROI 內每張牌的邊界框。
 
 功能:
-- 加載手牌區域 (ROI) 圖像。
-- 允許使用者互動式地調整切割參數 (例如牌寬、間距等，可能透過讀取/修改 configs/tile_slicer_config.json)。
-- 即時預覽根據當前參數切割出的單張牌圖片。
-- 幫助使用者找到最佳的切割參數並保存設定。
+- 讀取 `configs/roi_config.json` 獲取預先定義的手牌區域 (ROI) 座標。
+- 從 `screenshot_printwindow.png` 圖像中提取手牌 ROI。
+- 顯示手牌 ROI 圖像，並引導使用者依次點擊每張牌的邊界。
+  (注意：目前實現是讓使用者拖曳框選每張牌)。
+- 使用滑鼠回呼函數 (`mouse_callback`) 處理點擊和拖曳事件。
+- 記錄使用者為每張牌 (預期 `EXPECTED_TILES` 張) 框選的矩形座標 (x, y, w, h)。
+- 將所有確認的牌框座標列表保存到 `configs/tile_slicer_config.json` 文件中。
 
 用法:
-直接運行此腳本以啟動互動式切割工具:
-  python tools/interactive_tile_slicer.py
+直接運行此腳本以啟動互動式切割設定工具。
+```bash
+python tools/interactive_tile_slicer.py
+```
+運行前置條件:
+- 必須已成功執行 `tools/find_roi_interactively.py` 來生成 `configs/roi_config.json`。
+- 專案根目錄下必須存在 `screenshot_printwindow.png` 文件。
 
-前置需求:
-  - 必須先執行 tools/find_roi_interactively.py 產生 configs/roi_config.json。
-  - 專案根目錄下需要有 screenshot_printwindow.png 作為參考影像。
-
-功能:
-  - 讀取 configs/roi_config.json 獲取手牌區域座標。
-  - 從 screenshot_printwindow.png 提取手牌區域影像。
-  - 彈出視窗讓使用者依次點擊框選區域內的 14 張手牌。
-  - 將每張牌的相對座標 [(x, y, w, h), ...] 儲存到 configs/tile_slicer_config.json。
-
-其他模組如何使用:
-  - image_processing/tile_slicer.py 模組會讀取此工具產生的
-    configs/tile_slicer_config.json 檔案，以了解如何在手牌 ROI 影像中
-    切割出單張麻將牌。
+此工具生成的 `configs/tile_slicer_config.json` 文件包含了切割單張牌所需的精確座標，
+會被 `image_processing/tile_slicer.py` 模組讀取並用於實際的圖像切割。
 """
 import cv2
 import os
