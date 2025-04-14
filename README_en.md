@@ -1,14 +1,14 @@
 [查看中文版 (View Chinese Version)](README.md)
 
-# Mahjong Tile AI Clustering Tool
+# Mahjong Tile AI Image Analysis Tool (Clustering & Classification)
 
 ## Important Disclaimer
 
-**This project serves solely as a technical demonstration and educational resource, explaining the process of training an AI model for Mahjong tile clustering. The project itself does not provide any pre-trained model weights (`.pth` files) or a ready-to-use Mahjong AI application. Users need to collect their own data and complete the model training steps. Furthermore, please note that the methods described in this document are not the only way to achieve Mahjong tile clustering; various different techniques and strategies can accomplish similar goals.**
+**This project serves solely as a technical demonstration and educational resource, explaining the process of training AI models for Mahjong tile image analysis (including clustering and classification). The project itself does not provide any pre-trained model weights (`.pth` files) or a ready-to-use Mahjong AI application. Users need to collect their own data and complete the model training steps. Furthermore, please note that the methods described in this document are not the only way to achieve Mahjong tile image analysis; various different techniques and strategies can accomplish similar goals.**
 
 ## Project Goal
 
-This tool uses AI technology to automatically perform unsupervised clustering on captured Mahjong tile images. The goal is to start from scratch, collect data, train a model, and ultimately classify unknown Mahjong tile images (from the `capture/` directory) into different clusters within the `clustered_tiles/` directory. The project targets three-player Mahjong, aiming to classify tiles into 29 categories.
+This tool aims to demonstrate using AI technology for automatic analysis of captured Mahjong tile images, including using unsupervised **clustering** to assist data organization and training **classification** models to identify tiles. The goal is to start from scratch, collect data, train models, and ultimately classify unknown Mahjong tile images (from the `capture/` directory) into different clusters and use trained classifiers for precise identification and organization. The project targets three-player Mahjong, aiming to classify tiles into 29 categories.
 
 ## Project Structure
 
