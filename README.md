@@ -60,8 +60,7 @@
 ├── main.py               # 主要應用程式入口，啟動 GUI 介面以輔助圖片收集等操作
 ├── README.md             # 本說明文件 (中文)
 └── README_en.md          # 英文版說明文件
-# --- requirements.txt 通常存在，但 list_dir 未顯示，建議手動確認或添加 ---
-# ├── requirements.txt      # 列出專案所需的 Python 依賴庫
+└── requirements.txt      # 列出專案所需的 Python 依賴庫
 ```
 
 ## 從零開始的完整工作流程

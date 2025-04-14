@@ -60,8 +60,7 @@ This tool aims to demonstrate using AI technology for automatic analysis of capt
 ├── main.py               # Main application entry point, launches the GUI for assisted image collection etc.
 ├── README.md             # This documentation file (Chinese)
 └── README_en.md          # English version documentation file
-# --- requirements.txt usually exists but was not shown by list_dir, manual check/addition recommended ---
-# ├── requirements.txt      # Lists required Python dependencies for the project
+└── requirements.txt      # Lists required Python dependencies for the project
 ```
 
 ## Complete Workflow from Scratch
